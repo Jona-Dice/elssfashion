@@ -33,6 +33,7 @@ import Ventas from './Ventas'
 import Cuentas from './Cuentas'
 import Creditos from './Creditos'
 import Reportes from './Reportes'
+import Analisis from './Analisis'
 
 export default function Dashboard() {
   const [seccionActiva, setSeccionActiva] = useState('ventas')
@@ -110,10 +111,10 @@ export default function Dashboard() {
         )}
 
         {/* Navegación */}
-        <nav className="relative z-10 flex-1 p-3 md:p-4 space-y-2 flex flex-row md:flex-col md:overflow-auto">
+        <nav className="relative z-10 flex-1 p-2 md:p-4 flex flex-row md:flex-col overflow-x-auto md:overflow-y-auto no-scrollbar space-x-2 md:space-x-0 md:space-y-2">
           <button
             onClick={() => setSeccionActiva('ventas')}
-            className={`flex-1 md:w-full px-3 md:px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
+            className={`flex-shrink-0 md:w-full px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
               seccionActiva === 'ventas'
                 ? 'bg-slate-700 text-white shadow-lg'
                 : 'text-slate-300 hover:text-white hover:bg-slate-700/50 border border-transparent hover:border-slate-600'
@@ -125,7 +126,7 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setSeccionActiva('productos')}
-            className={`flex-1 md:w-full px-3 md:px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
+            className={`flex-shrink-0 md:w-full px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
               seccionActiva === 'productos'
                 ? 'bg-slate-700 text-white shadow-lg'
                 : 'text-slate-300 hover:text-white hover:bg-slate-700/50 border border-transparent hover:border-slate-600'
@@ -137,40 +138,52 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setSeccionActiva('cuentas')}
-            className={`flex-1 md:w-full px-3 md:px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
+            className={`flex-shrink-0 md:w-full px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
               seccionActiva === 'cuentas'
                 ? 'bg-slate-700 text-white shadow-lg'
                 : 'text-slate-300 hover:text-white hover:bg-slate-700/50 border border-transparent hover:border-slate-600'
             }`}
             title={!sidebarOpen ? 'Cuentas' : ''}
           >
-            <span className="text-lg md:text-xl flex-shrink-0">📊</span>
+            <span className="text-lg md:text-xl flex-shrink-0">🏛️</span>
             {sidebarOpen && <span>Cuentas</span>}
           </button>
-                <button
-                  onClick={() => setSeccionActiva('creditos')}
-                  className={`flex-1 md:w-full px-3 md:px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
-                    seccionActiva === 'creditos'
-                      ? 'bg-slate-700 text-white shadow-lg'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-700/50 border border-transparent hover:border-slate-600'
-                  }`}
-                  title={!sidebarOpen ? 'Créditos' : ''}
-                >
-                  <span className="text-lg md:text-xl flex-shrink-0">💳</span>
-                  {sidebarOpen && <span>Créditos</span>}
-                </button>
-                <button
-                  onClick={() => setSeccionActiva('reportes')}
-                  className={`flex-1 md:w-full px-3 md:px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
-                    seccionActiva === 'reportes'
-                      ? 'bg-slate-700 text-white shadow-lg'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-700/50 border border-transparent hover:border-slate-600'
-                  }`}
-                  title={!sidebarOpen ? 'Reportes' : ''}
-                >
-                  <span className="text-lg md:text-xl flex-shrink-0">📊</span>
-                  {sidebarOpen && <span>Reportes</span>}
-                </button>
+          <button
+            onClick={() => setSeccionActiva('creditos')}
+            className={`flex-shrink-0 md:w-full px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
+              seccionActiva === 'creditos'
+                ? 'bg-slate-700 text-white shadow-lg'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700/50 border border-transparent hover:border-slate-600'
+            }`}
+            title={!sidebarOpen ? 'Créditos' : ''}
+          >
+            <span className="text-lg md:text-xl flex-shrink-0">💳</span>
+            {sidebarOpen && <span>Créditos</span>}
+          </button>
+          <button
+            onClick={() => setSeccionActiva('reportes')}
+            className={`flex-shrink-0 md:w-full px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
+              seccionActiva === 'reportes'
+                ? 'bg-slate-700 text-white shadow-lg'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700/50 border border-transparent hover:border-slate-600'
+            }`}
+            title={!sidebarOpen ? 'Reportes' : ''}
+          >
+            <span className="text-lg md:text-xl flex-shrink-0">📊</span>
+            {sidebarOpen && <span>Reportes</span>}
+          </button>
+          <button
+            onClick={() => setSeccionActiva('analisis')}
+            className={`flex-shrink-0 md:w-full px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
+              seccionActiva === 'analisis'
+                ? 'bg-emerald-600 text-white shadow-lg'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700/50 border border-transparent hover:border-slate-600'
+            }`}
+            title={!sidebarOpen ? 'Análisis' : ''}
+          >
+            <span className="text-lg md:text-xl flex-shrink-0">🧠</span>
+            {sidebarOpen && <span>Análisis Pro</span>}
+          </button>
         </nav>
       </div>
 
@@ -181,10 +194,10 @@ export default function Dashboard() {
           {/* Título de Sección */}
           <div className="w-full md:w-auto">
             <h2 className="text-xl md:text-2xl font-bold text-slate-100">
-              {seccionActiva === 'ventas' ? '🛍️ Sistema de Ventas' : seccionActiva === 'productos' ? '📦 Gestión de Productos' : seccionActiva === 'cuentas' ? '📊 Contabilidad & Cuentas' : seccionActiva === 'creditos' ? '💳 Créditos & Clientes' : '📊 Generador de Reportes'}
+              {seccionActiva === 'ventas' ? '🛍️ Sistema de Ventas' : seccionActiva === 'productos' ? '📦 Gestión de Productos' : seccionActiva === 'cuentas' ? '📊 Contabilidad & Cuentas' : seccionActiva === 'creditos' ? '💳 Créditos & Clientes' : seccionActiva === 'reportes' ? '📊 Generador de Reportes' : '🧠 Análisis Inteligente'}
             </h2>
             <p className="text-slate-400 text-xs md:text-sm mt-1">
-              {seccionActiva === 'ventas' ? 'Registra y controla tus ventas' : seccionActiva === 'productos' ? 'Administra tu catálogo de productos' : seccionActiva === 'cuentas' ? 'Gestiona todas tus cuentas y transacciones' : seccionActiva === 'creditos' ? 'Maneja créditos a clientes y abonos' : 'Analiza y descarga reportes de tu negocio'}
+              {seccionActiva === 'ventas' ? 'Registra y controla tus ventas' : seccionActiva === 'productos' ? 'Administra tu catálogo de productos' : seccionActiva === 'cuentas' ? 'Gestiona todas tus cuentas y transacciones' : seccionActiva === 'creditos' ? 'Maneja créditos a clientes y abonos' : seccionActiva === 'reportes' ? 'Analiza y descarga reportes de tu negocio' : 'Visión integral y proyecciones de rentabilidad'}
             </p>
           </div>
 
@@ -234,6 +247,8 @@ export default function Dashboard() {
             <Creditos />
           ) : seccionActiva === 'reportes' ? (
             <Reportes />
+          ) : seccionActiva === 'analisis' ? (
+            <Analisis />
           ) : null}
         </div>
       </div>
