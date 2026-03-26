@@ -10,6 +10,11 @@ export default function Productos() {
   const [productosTrash, setProductosTrash] = useState([])
   const [agruparPorCategoria, setAgruparPorCategoria] = useState(true)
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  // Estado para editar producto
+  const [showModalEditar, setShowModalEditar] = useState(false)
+  const [productoEditando, setProductoEditando] = useState(null)
 
   const cargarCategorias = async () => {
     const { data } = await supabase.from('categorias').select('*').eq('is_deleted', false).order('nombre')
@@ -88,6 +93,55 @@ export default function Productos() {
     setProductosTrash(data || [])
   }
 
+  // 📸 Función reutilizable para subir imagen
+  const subirImagen = async (archivo) => {
+    if (!archivo) return null
+    
+    const timestamp = Date.now()
+    const ext = archivo.name.split('.').pop().toLowerCase()
+    const nombreArchivo = `${timestamp}.${ext}`
+    const BUCKET = 'productos-imagenes'
+    
+    // Intentar subir la imagen
+    let { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(`public/${nombreArchivo}`, archivo, {
+        cacheControl: '3600',
+        upsert: false
+      })
+    
+    // Si el bucket no existe, crearlo y reintentar
+    if (error && (error.message?.includes('Bucket not found') || error.statusCode === '404')) {
+      const { error: bucketError } = await supabase.storage.createBucket(BUCKET, {
+        public: true,
+        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
+        fileSizeLimit: 5242880 // 5MB
+      })
+      
+      if (bucketError && !bucketError.message?.includes('already exists')) {
+        throw new Error(`No se pudo crear el almacenamiento: ${bucketError.message}`)
+      }
+      
+      // Reintentar la subida
+      const retry = await supabase.storage
+        .from(BUCKET)
+        .upload(`public/${nombreArchivo}`, archivo, {
+          cacheControl: '3600',
+          upsert: false
+        })
+      
+      if (retry.error) throw retry.error
+    } else if (error) {
+      throw error
+    }
+    
+    const { data: urlData } = supabase.storage
+      .from(BUCKET)
+      .getPublicUrl(`public/${nombreArchivo}`)
+    
+    return urlData.publicUrl
+  }
+
   const crearProducto = async () => {
     if (!producto.nombre.trim() || !producto.precio_venta || !producto.stock || !producto.categoria_id) {
       setMensaje('Todos los campos son requeridos')
@@ -95,33 +149,21 @@ export default function Productos() {
       return
     }
 
+    setLoading(true)
     let imagenUrl = null
     
     if (producto.imagen) {
       try {
-        const timestamp = Date.now()
-        const ext = producto.imagen.name.split('.').pop()
-        const nombreArchivo = `${timestamp}.${ext}`
-        
-        const { data, error } = await supabase.storage
-          .from('productos-imagenes')
-          .upload(`public/${nombreArchivo}`, producto.imagen)
-        
-        if (error) throw error
-        
-        const { data: urlData } = supabase.storage
-          .from('productos-imagenes')
-          .getPublicUrl(`public/${nombreArchivo}`)
-        
-        imagenUrl = urlData.publicUrl
+        imagenUrl = await subirImagen(producto.imagen)
       } catch (error) {
         setMensaje('Error al subir la imagen: ' + error.message)
-        setTimeout(() => setMensaje(''), 3000)
+        setTimeout(() => setMensaje(''), 5000)
+        setLoading(false)
         return
       }
     }
 
-    await supabase.from('productos').insert({
+    const { error } = await supabase.from('productos').insert({
       nombre: producto.nombre,
       precio_venta: parseFloat(producto.precio_venta),
       stock: parseInt(producto.stock),
@@ -129,10 +171,83 @@ export default function Productos() {
       imagen_url: imagenUrl,
       is_deleted: false
     })
+
+    if (error) {
+      setMensaje('Error al crear producto: ' + error.message)
+      setTimeout(() => setMensaje(''), 5000)
+      setLoading(false)
+      return
+    }
+
     setProducto({ nombre: '', precio_venta: '', stock: '', categoria_id: '', imagen: null, previewImage: null })
-    setMensaje('Producto creado correctamente')
+    setMensaje('✅ Producto creado correctamente')
     setTimeout(() => setMensaje(''), 3000)
     await cargarProductos()
+    setLoading(false)
+  }
+
+  // ✏️ Abrir modal de edición
+  const abrirEdicion = (p) => {
+    setProductoEditando({
+      id: p.id,
+      nombre: p.nombre,
+      precio_venta: p.precio_venta,
+      stock: p.stock,
+      categoria_id: p.categoria_id,
+      imagen_url: p.imagen_url,
+      imagen: null,
+      previewImage: p.imagen_url || null
+    })
+    setShowModalEditar(true)
+  }
+
+  // 💾 Guardar edición
+  const guardarEdicion = async () => {
+    if (!productoEditando.nombre.trim() || !productoEditando.precio_venta || !productoEditando.stock || !productoEditando.categoria_id) {
+      setMensaje('Todos los campos son requeridos')
+      setTimeout(() => setMensaje(''), 3000)
+      return
+    }
+
+    setLoading(true)
+    let imagenUrl = productoEditando.imagen_url
+
+    // Si se seleccionó una imagen nueva, subirla
+    if (productoEditando.imagen) {
+      try {
+        imagenUrl = await subirImagen(productoEditando.imagen)
+      } catch (error) {
+        setMensaje('Error al subir la imagen: ' + error.message)
+        setTimeout(() => setMensaje(''), 5000)
+        setLoading(false)
+        return
+      }
+    }
+
+    const { error } = await supabase
+      .from('productos')
+      .update({
+        nombre: productoEditando.nombre,
+        precio_venta: parseFloat(productoEditando.precio_venta),
+        stock: parseInt(productoEditando.stock),
+        categoria_id: productoEditando.categoria_id,
+        imagen_url: imagenUrl
+      })
+      .eq('id', productoEditando.id)
+
+    if (error) {
+      setMensaje('Error al actualizar producto: ' + error.message)
+      setTimeout(() => setMensaje(''), 5000)
+      setLoading(false)
+      return
+    }
+
+    setShowModalEditar(false)
+    setProductoEditando(null)
+    setMensaje('✅ Producto actualizado correctamente')
+    setTimeout(() => setMensaje(''), 3000)
+    await cargarProductos()
+    setLoading(false)
   }
 
   const moverProductoPapelera = async (id) => {
@@ -334,10 +449,11 @@ export default function Productos() {
 
             <button
               onClick={crearProducto}
-              className="w-full relative overflow-hidden group bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 md:py-4 px-6 rounded-xl transition-all transform hover:scale-105 active:scale-95 shadow-lg text-xs sm:text-base"
+              disabled={loading}
+              className="w-full relative overflow-hidden group bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 md:py-4 px-6 rounded-xl transition-all transform hover:scale-105 active:scale-95 shadow-lg text-xs sm:text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <span className="relative">✓ Crear Producto</span>
+              <span className="relative">{loading ? '⏳ Creando...' : '✓ Crear Producto'}</span>
             </button>
           </div>
         </div>
@@ -453,12 +569,22 @@ export default function Productos() {
                               <h3 className="font-bold text-slate-100 text-sm md:text-lg mb-1 group-hover:text-slate-50 transition-colors line-clamp-2">{p.nombre}</h3>
                               <p className="text-xs text-slate-400 line-clamp-1">{p.categorias?.nombre}</p>
                             </div>
-                            <button
-                              onClick={() => moverProductoPapelera(p.id)}
-                              className="text-slate-500 hover:text-slate-300 hover:bg-slate-600/30 font-bold px-2 py-1 rounded-lg transition-all transform hover:scale-110 active:scale-90 flex-shrink-0 ml-2"
-                            >
-                              🗑️
-                            </button>
+                            <div className="flex gap-1 flex-shrink-0 ml-2">
+                              <button
+                                onClick={() => abrirEdicion(p)}
+                                className="text-slate-500 hover:text-blue-300 hover:bg-blue-600/20 font-bold px-2 py-1 rounded-lg transition-all transform hover:scale-110 active:scale-90"
+                                title="Editar"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => moverProductoPapelera(p.id)}
+                                className="text-slate-500 hover:text-slate-300 hover:bg-slate-600/30 font-bold px-2 py-1 rounded-lg transition-all transform hover:scale-110 active:scale-90"
+                                title="Eliminar"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </div>
 
                           <div className="space-y-2 md:space-y-3 mb-3 md:mb-4 flex-1">
@@ -537,12 +663,22 @@ export default function Productos() {
                         <h3 className="font-bold text-slate-100 text-sm md:text-lg mb-1 group-hover:text-slate-50 transition-colors line-clamp-2">{p.nombre}</h3>
                         <p className="text-xs text-slate-400 line-clamp-1">{p.categorias?.nombre}</p>
                       </div>
-                      <button
-                        onClick={() => moverProductoPapelera(p.id)}
-                        className="text-slate-500 hover:text-slate-300 hover:bg-slate-600/30 font-bold px-2 py-1 rounded-lg transition-all transform hover:scale-110 active:scale-90 flex-shrink-0 ml-2"
-                      >
-                        🗑️
-                      </button>
+                      <div className="flex gap-1 flex-shrink-0 ml-2">
+                        <button
+                          onClick={() => abrirEdicion(p)}
+                          className="text-slate-500 hover:text-blue-300 hover:bg-blue-600/20 font-bold px-2 py-1 rounded-lg transition-all transform hover:scale-110 active:scale-90"
+                          title="Editar"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => moverProductoPapelera(p.id)}
+                          className="text-slate-500 hover:text-slate-300 hover:bg-slate-600/30 font-bold px-2 py-1 rounded-lg transition-all transform hover:scale-110 active:scale-90"
+                          title="Eliminar"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-2 md:space-y-3 mb-3 md:mb-4 flex-1">
@@ -653,6 +789,115 @@ export default function Productos() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal Editar Producto */}
+      {showModalEditar && productoEditando && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="backdrop-blur-md bg-slate-800/95 border border-slate-700 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-slate-100 mb-6 flex items-center gap-2">✏️ Editar Producto</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-slate-300 font-semibold text-sm mb-2">Nombre *</label>
+                <input
+                  type="text"
+                  value={productoEditando.nombre}
+                  onChange={e => setProductoEditando({ ...productoEditando, nombre: e.target.value })}
+                  className="w-full bg-slate-700/30 border border-slate-600 text-slate-100 placeholder-slate-500 rounded-xl px-4 py-3 focus:outline-none focus:border-slate-500 transition text-sm"
+                  placeholder="Nombre del producto"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-300 font-semibold text-sm mb-2">Precio de venta *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={productoEditando.precio_venta}
+                  onChange={e => setProductoEditando({ ...productoEditando, precio_venta: e.target.value })}
+                  className="w-full bg-slate-700/30 border border-slate-600 text-slate-100 placeholder-slate-500 rounded-xl px-4 py-3 focus:outline-none focus:border-slate-500 transition text-sm"
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-300 font-semibold text-sm mb-2">Stock *</label>
+                <input
+                  type="number"
+                  value={productoEditando.stock}
+                  onChange={e => setProductoEditando({ ...productoEditando, stock: e.target.value })}
+                  className="w-full bg-slate-700/30 border border-slate-600 text-slate-100 placeholder-slate-500 rounded-xl px-4 py-3 focus:outline-none focus:border-slate-500 transition text-sm"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-300 font-semibold text-sm mb-2">Categoría *</label>
+                <select
+                  value={productoEditando.categoria_id}
+                  onChange={e => setProductoEditando({ ...productoEditando, categoria_id: e.target.value })}
+                  className="w-full bg-slate-700/30 border border-slate-600 text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:border-slate-500 transition text-sm"
+                >
+                  <option value="" className="bg-slate-800">Selecciona una categoría</option>
+                  {categorias.map(cat => (
+                    <option key={cat.id} value={cat.id} className="bg-slate-800">{cat.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Imagen actual */}
+              <div>
+                <label className="block text-slate-300 font-semibold text-sm mb-2">Imagen del producto</label>
+                {productoEditando.previewImage && (
+                  <div className="relative mb-3">
+                    <img
+                      src={productoEditando.previewImage}
+                      alt="Preview"
+                      className="w-full h-40 object-cover rounded-xl border border-slate-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setProductoEditando({ ...productoEditando, imagen: null, previewImage: null, imagen_url: null })}
+                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded-lg text-xs font-bold transition"
+                    >
+                      ✕ Remover
+                    </button>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files[0]
+                    if (file) {
+                      setProductoEditando({
+                        ...productoEditando,
+                        imagen: file,
+                        previewImage: URL.createObjectURL(file)
+                      })
+                    }
+                  }}
+                  className="w-full backdrop-blur-sm bg-slate-700/30 border border-slate-600 text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:border-slate-500 transition text-xs sm:text-sm file:bg-slate-600 file:border-0 file:text-slate-100 file:px-3 file:py-1 file:rounded-lg file:cursor-pointer hover:file:bg-slate-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-6">
+              <button
+                type="button"
+                onClick={() => { setShowModalEditar(false); setProductoEditando(null) }}
+                className="flex-1 bg-slate-700/30 hover:bg-slate-700/50 text-slate-300 font-bold py-3 rounded-xl transition-all text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardarEdicion}
+                disabled={loading}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                {loading ? '⏳ Guardando...' : '💾 Guardar Cambios'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

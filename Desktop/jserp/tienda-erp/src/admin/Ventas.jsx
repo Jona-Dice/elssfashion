@@ -84,7 +84,7 @@ export default function Ventas() {
     cargarVentasTrash()
   }, [])
 
-  // ➕ Agregar producto al carrito
+  // ➕ Agregar producto al carrito (con límite de stock)
   const agregarProducto = (producto) => {
     if (producto.stock <= 0) {
       setMensaje('Producto sin stock')
@@ -96,14 +96,18 @@ export default function Ventas() {
       const existe = prevCarrito.find(p => p.id === producto.id)
 
       if (existe) {
-        // Si existe, incrementar cantidad
+        // Validar que no exceda el stock disponible
+        if (existe.cantidad >= producto.stock) {
+          setMensaje(`⚠️ Stock máximo alcanzado (${producto.stock} disponibles)`)
+          setTimeout(() => setMensaje(''), 3000)
+          return prevCarrito
+        }
         return prevCarrito.map(p =>
           p.id === producto.id
             ? { ...p, cantidad: p.cantidad + 1 }
             : p
         )
       } else {
-        // Si no existe, agregar nuevo producto
         return [...prevCarrito, { ...producto, cantidad: 1 }]
       }
     })
@@ -122,8 +126,10 @@ export default function Ventas() {
     return sum + (parseFloat(p.precio_venta) || 0) * (p.cantidad || 1)
   }, 0)
 
-  // 🧾 Registrar venta
-  const registrarVenta = async () => {
+  // 🧾 Registrar venta (tipoOverride permite forzar tipo sin depender de setState asíncrono)
+  const registrarVenta = async (tipoOverride) => {
+    const tipoFinal = tipoOverride || tipoVenta
+
     if (carrito.length === 0) {
       setMensaje('El carrito está vacío')
       setTimeout(() => setMensaje(''), 3000)
@@ -131,7 +137,7 @@ export default function Ventas() {
     }
 
     // 🆕 VALIDACIÓN: Cliente obligatorio en crédito
-    if (tipoVenta === 'credito' && !clienteSeleccionado) {
+    if (tipoFinal === 'credito' && !clienteSeleccionado) {
       setMensaje('❌ Debes seleccionar un cliente para venta a crédito')
       setTimeout(() => setMensaje(''), 3000)
       return
@@ -152,14 +158,14 @@ export default function Ventas() {
       return
     }
 
-    // 🧾 Crear venta - CORRECCIÓN: usar estado y tipo_venta adecuadamente
+    // 🧾 Crear venta
     const { data: venta, error: errorVenta } = await supabase
       .from('ventas')
       .insert({
         total,
-        estado: 'venta',  // Siempre 'venta' excepto cuando es apartado
-        tipo_venta: tipoVenta,  // 'contado', 'credito', 'apartado'
-        cliente_id: tipoVenta === 'credito' ? clienteSeleccionado : null,  // Guardar cliente si es crédito
+        estado: tipoFinal === 'apartado' ? 'apartado' : 'venta',
+        tipo_venta: tipoFinal,
+        cliente_id: tipoFinal === 'credito' ? clienteSeleccionado : null,
         usuario_id: user.id
       })
       .select()
@@ -173,7 +179,7 @@ export default function Ventas() {
       return
     }
 
-    // 📦 Detalle de venta
+    // 📦 Detalle de venta + descontar stock
     for (const p of carrito) {
       const { error: errorDetalle } = await supabase
         .from('detalle_ventas')
@@ -192,11 +198,22 @@ export default function Ventas() {
         setTimeout(() => setMensaje(''), 3000)
         return
       }
+
+      // 📉 Descontar stock del producto
+      const nuevoStock = Math.max(0, p.stock - p.cantidad)
+      const { error: errorStock } = await supabase
+        .from('productos')
+        .update({ stock: nuevoStock })
+        .eq('id', p.id)
+
+      if (errorStock) {
+        console.error('Error al descontar stock:', errorStock)
+      }
     }
 
     // 💳 Si es venta a crédito, crear registro en tabla creditos
-    if (tipoVenta === 'credito' && clienteSeleccionado) {
-      const { error: errorCredito, data: creditoData } = await supabase
+    if (tipoFinal === 'credito' && clienteSeleccionado) {
+      const { error: errorCredito } = await supabase
         .from('creditos')
         .insert({
           cliente_id: clienteSeleccionado,
@@ -211,12 +228,6 @@ export default function Ventas() {
 
       if (errorCredito) {
         console.error('ERROR al crear crédito:', errorCredito)
-        console.error('Datos enviados:', {
-          cliente_id: clienteSeleccionado,
-          venta_id: venta.id,
-          monto_total: total,
-          usuario_id: user.id
-        })
         setMensaje('❌ Error al crear el crédito: ' + (errorCredito.message || JSON.stringify(errorCredito)))
         setLoading(false)
         setTimeout(() => setMensaje(''), 5000)
@@ -224,12 +235,11 @@ export default function Ventas() {
       }
     }
 
-    // 🔄 Recargar productos
+    // 🔄 Recargar productos (con stock actualizado)
     await cargarProductos()
     
-    // 💳 NUEVO: Registrar transacción TANTO para contado como para crédito
-    if (tipoVenta === 'contado') {
-      // Venta al contado - registrar como ingreso
+    // 💳 Registrar transacción contable
+    if (tipoFinal === 'contado') {
       const descripcionProductos = carrito.map(p => `${p.cantidad}x ${p.nombre}`).join(', ')
       try {
         await registerAccountTransaction({
@@ -243,8 +253,7 @@ export default function Ventas() {
         setMensaje('Venta registrada, pero error al actualizar la cuenta principal')
         setTimeout(() => setMensaje(''), 3000)
       }
-    } else if (tipoVenta === 'credito' && clienteSeleccionado) {
-      // 🆕 NUEVO: Venta a crédito - registrar en Cuentas por Cobrar (dinero esperado)
+    } else if (tipoFinal === 'credito' && clienteSeleccionado) {
       const clienteNombre = clientes.find(c => c.id === clienteSeleccionado)?.nombre || 'Cliente'
       const descripcionProductos = carrito.map(p => `${p.cantidad}x ${p.nombre}`).join(', ')
       
@@ -254,11 +263,10 @@ export default function Ventas() {
           tipo: 'ingreso',
           monto: total,
           descripcion: `Crédito a ${clienteNombre} - Venta ${venta.id}: ${descripcionProductos}`,
-          esCredito: true  // 🎯 AQUÍ: Registra en "Cuentas por Cobrar", no en "Cuenta de Prueba"
+          esCredito: true
         })
       } catch (err) {
         console.error('Error registrando transacción de crédito', err)
-        // No bloqueamos la venta, solo alertamos
         setMensaje('⚠️ Venta a crédito registrada pero error en flujo de caja')
         setTimeout(() => setMensaje(''), 3000)
       }
@@ -267,7 +275,7 @@ export default function Ventas() {
     // Limpiar carrito
     setCarrito([])
     setLoading(false)
-    setMensaje(`Venta ${tipoVenta === 'contado' ? 'realizada' : tipoVenta === 'apartado' ? 'apartada' : 'a crédito'} correctamente ✅`)
+    setMensaje(`Venta ${tipoFinal === 'contado' ? 'realizada' : tipoFinal === 'apartado' ? 'apartada' : 'a crédito'} correctamente ✅`)
     setTimeout(() => setMensaje(''), 3000)
   }
 
@@ -389,12 +397,20 @@ export default function Ventas() {
 
                       {/* Imagen */}
                       <div className="relative w-full h-24 sm:h-28 lg:h-40 bg-gradient-to-br from-slate-600/30 to-slate-700/30 flex items-center justify-center overflow-hidden">
-                        <img
-                          src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=300&fit=crop"
-                          alt={p.nombre}
-                          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent"></div>
+                        {p.imagen_url ? (
+                          <>
+                            <img
+                              src={p.imagen_url}
+                              alt={p.nombre}
+                              className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent"></div>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-slate-500">
+                            <span className="text-2xl md:text-3xl">🖼️</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Contenido */}
@@ -462,11 +478,15 @@ export default function Ventas() {
                       >
                         {/* Imagen pequeña del producto */}
                         <div className="flex-shrink-0 w-16 md:w-20 h-16 md:h-20 bg-gradient-to-br from-slate-600/30 to-slate-700/30 rounded-lg overflow-hidden border border-slate-600">
-                          <img
-                            src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=100&h=100&fit=crop"
-                            alt={p.nombre}
-                            className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
-                          />
+                          {p.imagen_url ? (
+                            <img
+                              src={p.imagen_url}
+                              alt={p.nombre}
+                              className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-slate-500 text-lg">🖼️</div>
+                          )}
                         </div>
 
                         {/* Información del producto */}
@@ -502,26 +522,7 @@ export default function Ventas() {
                     </div>
 
                     <div className="space-y-2 md:space-y-3">
-                      <button
-                        onClick={() => registrarVenta('venta')}
-                        disabled={loading || carrito.length === 0}
-                        className="w-full relative overflow-hidden group bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 md:py-4 px-4 md:px-6 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg shadow-blue-600/30 text-xs md:text-base"
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-r from-white/0 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="relative flex items-center justify-center gap-2">
-                          {loading ? (
-                            <>
-                              <span className="animate-spin">⏳</span>
-                              <span>Procesando...</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>✓</span>
-                              <span>Completar Venta</span>
-                            </>
-                          )}
-                        </div>
-                      </button>
+
 
                       {/* Selector de tipo de venta */}
                       <div className="space-y-3 bg-slate-700/20 border border-slate-600 rounded-xl p-3 md:p-4">
@@ -596,12 +597,7 @@ export default function Ventas() {
                         </div>
                       </button>
                       <button
-                        onClick={async () => {
-                          const tipoVentaOriginal = tipoVenta
-                          setTipoVenta('apartado')
-                          await registrarVenta()
-                          setTipoVenta(tipoVentaOriginal)
-                        }}
+                        onClick={() => registrarVenta('apartado')}
                         disabled={loading || carrito.length === 0}
                         className="w-full relative overflow-hidden group bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 md:py-4 px-4 md:px-6 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg shadow-amber-600/30 text-xs md:text-base"
                       >
