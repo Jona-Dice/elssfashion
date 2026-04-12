@@ -573,7 +573,7 @@ export default function Creditos() {
                 <input
                   type="text"
                   disabled
-                  value={`$${creditos.find(c => c.id === creditoSeleccionado)?.monto_pendiente.toFixed(2) || '0.00'}`}
+                  value={`$${parseFloat(creditos.find(c => c.id === creditoSeleccionado)?.monto_pendiente || 0).toFixed(2)}`}
                   className="w-full bg-slate-700/30 border border-slate-600 text-slate-400 rounded-lg px-4 py-3 text-sm"
                 />
               </div>

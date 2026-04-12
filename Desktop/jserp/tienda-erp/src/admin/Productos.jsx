@@ -93,21 +93,67 @@ export default function Productos() {
     setProductosTrash(data || [])
   }
 
-  // 📸 Función reutilizable para subir imagen
+  // 🗜️ Comprimir y redimensionar imagen antes de subir
+  const comprimirImagen = (archivo, maxAncho = 800, maxAlto = 800, calidad = 0.8) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        let ancho = img.width
+        let alto = img.height
+
+        // Redimensionar manteniendo proporción
+        if (ancho > maxAncho || alto > maxAlto) {
+          const ratio = Math.min(maxAncho / ancho, maxAlto / alto)
+          ancho = Math.round(ancho * ratio)
+          alto = Math.round(alto * ratio)
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = ancho
+        canvas.height = alto
+
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, ancho, alto)
+
+        // Convertir a WebP (mucho más liviano que PNG/JPEG)
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error('Error al comprimir imagen'))
+            resolve(blob)
+          },
+          'image/webp',
+          calidad
+        )
+      }
+      img.onerror = () => reject(new Error('Error al cargar la imagen'))
+      img.src = URL.createObjectURL(archivo)
+    })
+  }
+
+  // 📸 Función reutilizable para subir imagen (con compresión automática)
   const subirImagen = async (archivo) => {
     if (!archivo) return null
-    
+
+    // Comprimir imagen antes de subir
+    let archivoFinal
+    try {
+      archivoFinal = await comprimirImagen(archivo)
+    } catch (err) {
+      console.warn('No se pudo comprimir, subiendo original:', err)
+      archivoFinal = archivo
+    }
+
     const timestamp = Date.now()
-    const ext = archivo.name.split('.').pop().toLowerCase()
-    const nombreArchivo = `${timestamp}.${ext}`
+    const nombreArchivo = `${timestamp}.webp`
     const BUCKET = 'productos-imagenes'
     
-    // Intentar subir la imagen
+    // Intentar subir la imagen comprimida
     let { error } = await supabase.storage
       .from(BUCKET)
-      .upload(`public/${nombreArchivo}`, archivo, {
-        cacheControl: '3600',
-        upsert: false
+      .upload(`public/${nombreArchivo}`, archivoFinal, {
+        cacheControl: '31536000',
+        upsert: false,
+        contentType: 'image/webp'
       })
     
     // Si el bucket no existe, crearlo y reintentar
@@ -115,19 +161,19 @@ export default function Productos() {
       const { error: bucketError } = await supabase.storage.createBucket(BUCKET, {
         public: true,
         allowedMimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
-        fileSizeLimit: 5242880 // 5MB
+        fileSizeLimit: 5242880
       })
       
       if (bucketError && !bucketError.message?.includes('already exists')) {
         throw new Error(`No se pudo crear el almacenamiento: ${bucketError.message}`)
       }
       
-      // Reintentar la subida
       const retry = await supabase.storage
         .from(BUCKET)
-        .upload(`public/${nombreArchivo}`, archivo, {
-          cacheControl: '3600',
-          upsert: false
+        .upload(`public/${nombreArchivo}`, archivoFinal, {
+          cacheControl: '31536000',
+          upsert: false,
+          contentType: 'image/webp'
         })
       
       if (retry.error) throw retry.error
@@ -550,6 +596,7 @@ export default function Productos() {
                               <img
                                 src={p.imagen_url}
                                 alt={p.nombre}
+                                loading="lazy"
                                 className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent"></div>
@@ -644,6 +691,7 @@ export default function Productos() {
                         <img
                           src={p.imagen_url}
                           alt={p.nombre}
+                          loading="lazy"
                           className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent"></div>

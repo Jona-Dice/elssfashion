@@ -357,7 +357,8 @@ export default function Cuentas() {
         monto,
         descripcion: descripcionTransaccion,
         saldo_anterior: cuenta.saldo,
-        saldo_nuevo: nuevoSaldo
+        saldo_nuevo: nuevoSaldo,
+        is_deleted: false
       })
 
     // Actualizar saldo de la cuenta

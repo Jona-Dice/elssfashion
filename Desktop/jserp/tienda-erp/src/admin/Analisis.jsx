@@ -182,14 +182,23 @@ export default function Analisis() {
               Evaluación profesional de rentabilidad, eficiencia de ventas y salud financiera.
             </p>
           </div>
-          <button 
-            onClick={cargarDatos}
-            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-2xl text-white font-bold transition-all flex items-center gap-2 group shadow-lg active:scale-95"
-            title="Actualizar datos"
-          >
-            <span className="group-hover:rotate-180 transition-transform duration-500">🔄</span>
-            <span>Recargar Análisis</span>
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => window.dispatchEvent(new CustomEvent('cambiarSeccion', { detail: 'ia' }))}
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 border border-indigo-400/50 rounded-2xl text-white font-bold transition-all flex items-center gap-2 group shadow-lg active:scale-95"
+            >
+              <span>🤖</span>
+              <span>Consultar con IA</span>
+            </button>
+            <button 
+              onClick={cargarDatos}
+              className="px-6 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-2xl text-white font-bold transition-all flex items-center gap-2 group shadow-lg active:scale-95"
+              title="Actualizar datos"
+            >
+              <span className="group-hover:rotate-180 transition-transform duration-500">🔄</span>
+              <span>Recargar Análisis</span>
+            </button>
+          </div>
         </div>
 
         {/* KPIs Principales */}

@@ -34,6 +34,7 @@ import Cuentas from './Cuentas'
 import Creditos from './Creditos'
 import Reportes from './Reportes'
 import Analisis from './Analisis'
+import AIAgente from './AIAgente'
 
 export default function Dashboard() {
   const [seccionActiva, setSeccionActiva] = useState('ventas')
@@ -58,6 +59,12 @@ export default function Dashboard() {
       }
     }
     getUser()
+
+    const handleCambiarSeccion = (e) => {
+      setSeccionActiva(e.detail)
+    }
+    window.addEventListener('cambiarSeccion', handleCambiarSeccion)
+    return () => window.removeEventListener('cambiarSeccion', handleCambiarSeccion)
   }, [])
 
   const logout = async () => {
@@ -184,6 +191,18 @@ export default function Dashboard() {
             <span className="text-lg md:text-xl flex-shrink-0">🧠</span>
             {sidebarOpen && <span>Análisis Pro</span>}
           </button>
+          <button
+            onClick={() => setSeccionActiva('ia')}
+            className={`flex-shrink-0 md:w-full px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
+              seccionActiva === 'ia'
+                ? 'bg-indigo-600 text-white shadow-lg'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700/50 border border-transparent hover:border-slate-600'
+            }`}
+            title={!sidebarOpen ? 'Agente IA' : ''}
+          >
+            <span className="text-lg md:text-xl flex-shrink-0">🤖</span>
+            {sidebarOpen && <span>Agente IA</span>}
+          </button>
         </nav>
       </div>
 
@@ -194,10 +213,10 @@ export default function Dashboard() {
           {/* Título de Sección */}
           <div className="w-full md:w-auto">
             <h2 className="text-xl md:text-2xl font-bold text-slate-100">
-              {seccionActiva === 'ventas' ? '🛍️ Sistema de Ventas' : seccionActiva === 'productos' ? '📦 Gestión de Productos' : seccionActiva === 'cuentas' ? '📊 Contabilidad & Cuentas' : seccionActiva === 'creditos' ? '💳 Créditos & Clientes' : seccionActiva === 'reportes' ? '📊 Generador de Reportes' : '🧠 Análisis Inteligente'}
+              {seccionActiva === 'ventas' ? '🛍️ Sistema de Ventas' : seccionActiva === 'productos' ? '📦 Gestión de Productos' : seccionActiva === 'cuentas' ? '📊 Contabilidad & Cuentas' : seccionActiva === 'creditos' ? '💳 Créditos & Clientes' : seccionActiva === 'reportes' ? '📊 Generador de Reportes' : seccionActiva === 'ia' ? '🤖 Agente de Negocios IA' : '🧠 Análisis Inteligente'}
             </h2>
             <p className="text-slate-400 text-xs md:text-sm mt-1">
-              {seccionActiva === 'ventas' ? 'Registra y controla tus ventas' : seccionActiva === 'productos' ? 'Administra tu catálogo de productos' : seccionActiva === 'cuentas' ? 'Gestiona todas tus cuentas y transacciones' : seccionActiva === 'creditos' ? 'Maneja créditos a clientes y abonos' : seccionActiva === 'reportes' ? 'Analiza y descarga reportes de tu negocio' : 'Visión integral y proyecciones de rentabilidad'}
+              {seccionActiva === 'ventas' ? 'Registra y controla tus ventas' : seccionActiva === 'productos' ? 'Administra tu catálogo de productos' : seccionActiva === 'cuentas' ? 'Gestiona todas tus cuentas y transacciones' : seccionActiva === 'creditos' ? 'Maneja créditos a clientes y abonos' : seccionActiva === 'reportes' ? 'Analiza y descarga reportes de tu negocio' : seccionActiva === 'ia' ? 'Recomendaciones estratégicas basadas en tus datos reales' : 'Visión integral y proyecciones de rentabilidad'}
             </p>
           </div>
 
@@ -249,6 +268,8 @@ export default function Dashboard() {
             <Reportes />
           ) : seccionActiva === 'analisis' ? (
             <Analisis />
+          ) : seccionActiva === 'ia' ? (
+            <AIAgente />
           ) : null}
         </div>
       </div>

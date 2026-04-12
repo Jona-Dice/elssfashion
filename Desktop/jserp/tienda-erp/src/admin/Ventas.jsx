@@ -402,6 +402,7 @@ export default function Ventas() {
                             <img
                               src={p.imagen_url}
                               alt={p.nombre}
+                              loading="lazy"
                               className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent"></div>
@@ -482,6 +483,7 @@ export default function Ventas() {
                             <img
                               src={p.imagen_url}
                               alt={p.nombre}
+                              loading="lazy"
                               className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
                             />
                           ) : (
