@@ -11,6 +11,7 @@ export default function Productos() {
   const [agruparPorCategoria, setAgruparPorCategoria] = useState(true)
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [showOutOfStock, setShowOutOfStock] = useState(false)
 
   // Estado para editar producto
   const [showModalEditar, setShowModalEditar] = useState(false)
@@ -314,7 +315,9 @@ export default function Productos() {
 
   const agruparProductosPorCategoria = () => {
     const agrupados = {}
-    productos.forEach(p => {
+    const productosFiltrados = showOutOfStock ? productos : productos.filter(p => p.stock > 0)
+    
+    productosFiltrados.forEach(p => {
       const nombreCategoria = p.categorias?.nombre || 'Sin categoría'
       if (!agrupados[nombreCategoria]) {
         agrupados[nombreCategoria] = []
@@ -538,6 +541,16 @@ export default function Productos() {
                 >
                   📋 Ver Todos
                 </button>
+                <button
+                  onClick={() => setShowOutOfStock(!showOutOfStock)}
+                  className={`font-bold px-4 md:px-6 py-2 md:py-3 rounded-xl transition transform hover:scale-105 active:scale-95 shadow-lg text-xs sm:text-base whitespace-nowrap ${
+                    showOutOfStock
+                      ? 'bg-purple-600 hover:bg-purple-500 text-white border-2 border-purple-400'
+                      : 'bg-slate-700 hover:bg-slate-600 text-white border-2 border-transparent'
+                  }`}
+                >
+                  {showOutOfStock ? '🚫 Ocultar Agotados' : '👁️ Ver Agotados'}
+                </button>
               </div>
             )}
           </div>
@@ -676,7 +689,7 @@ export default function Productos() {
           ) : (
             // Vista de todos los productos
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              {productos.map(p => (
+              {(showOutOfStock ? productos : productos.filter(p => p.stock > 0)).map(p => (
                 <div
                   key={p.id}
                   className="group relative overflow-hidden backdrop-blur-sm border border-slate-600 bg-slate-700/20 rounded-2xl shadow-lg transition-all duration-300 flex flex-col text-xs md:text-sm hover:border-slate-500 hover:shadow-2xl hover:shadow-slate-700/20 hover:scale-105"

@@ -1,46 +1,48 @@
 import { supabase } from './supabase'
 
 export async function createUserWithRole({ email, password, role = 'vendedor' }) {
-  // Crear usuario con signUp (cliente). Requiere conocer contraseña.
-  const { data, error } = await supabase.auth.signUp({ email, password })
-  if (error) throw error
-
-  const user = data.user || null
-
-  // Insertar/actualizar perfil en la tabla `perfiles` (admin deberá tener permisos RLS)
-  if (user) {
-    // Primero intentamos con la columna `user_id` (si tu esquema la tiene)
-    try {
-      const { data: perfilData, error: errPerfil } = await supabase
-        .from('perfiles')
-        .upsert({ user_id: user.id, rol: role }, { onConflict: 'user_id' })
-
-      if (!errPerfil) return { user, perfil: perfilData }
-      // si hay un error, lo dejamos caer al siguiente intento
-      console.warn('Upsert perfiles con user_id falló, intentando con id:', errPerfil)
-    } catch (e) {
-      console.warn('Upsert con user_id lanzó excepción, intentando con id:', e)
+  // 1. Crear usuario en Supabase Auth
+  const { data, error: authError } = await supabase.auth.signUp({ 
+    email, 
+    password,
+    options: {
+      data: { rol: role } // También lo guardamos en metadata por si acaso
     }
+  })
+  
+  if (authError) throw authError
 
-    // Intentar con la columna `id` (esquemas que usan perfiles.id = auth.users.id)
-    try {
-      const { data: perfilData2, error: errPerfil2 } = await supabase
-        .from('perfiles')
-        .upsert({ id: user.id, rol: role }, { onConflict: 'id' })
+  const user = data.user
+  if (!user) return { user: null, error: new Error('No se pudo crear el usuario') }
 
-      if (errPerfil2) {
-        console.error('Error al crear/actualizar perfil con id:', errPerfil2)
-        return { user, error: errPerfil2 }
+  // 2. Crear perfil en la tabla 'perfiles'
+  // Intentamos con email, si falla (porque no existe la columna) reintentamos sin él.
+  const { data: perfilData, error: perfilError } = await supabase
+    .from('perfiles')
+    .insert([
+      { 
+        id: user.id, 
+        rol: role,
+        email: email
       }
+    ])
+    .select()
 
-      return { user, perfil: perfilData2 }
-    } catch (e) {
-      console.error('Error inesperado al upsertear perfil:', e)
-      return { user, error: e }
+  if (perfilError) {
+    console.warn('Fallo insert con email en perfiles, reintentando sin email...', perfilError)
+    const { data: retryData, error: retryError } = await supabase
+      .from('perfiles')
+      .insert([{ id: user.id, rol: role }])
+      .select()
+    
+    if (retryError) {
+      console.error('Error definitivo al crear perfil:', retryError)
+      return { user, error: retryError }
     }
+    return { user, perfil: retryData?.[0] }
   }
 
-  return { user, error }
+  return { user, perfil: perfilData?.[0] }
 }
 
 export async function getProfile(userId) {

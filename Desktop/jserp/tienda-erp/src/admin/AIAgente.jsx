@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { analyzeBusinessData, hasGeminiKey, setGeminiKey } from '../lib/gemini'
+import { analyzeBusinessData, hasGeminiKey, setGeminiKey, clearGeminiKey } from '../lib/gemini'
 
 export default function AIAgente() {
   const [datos, setDatos] = useState(null)
@@ -134,9 +134,16 @@ export default function AIAgente() {
 
   const handleSaveKey = () => {
     if (apiKey.trim()) {
-      setGeminiKey(apiKey)
+      setGeminiKey(apiKey.trim())
       setShowKeyInput(false)
+      setApiKey("")
     }
+  }
+
+  const handleClearKey = () => {
+    clearGeminiKey()
+    setShowKeyInput(true)
+    setApiKey("")
   }
 
   if (cargando) return <div className="p-8 text-center text-slate-400">Escaneando red neuronal del negocio...</div>
@@ -144,27 +151,45 @@ export default function AIAgente() {
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto pb-24">
       
-      {showKeyInput && (
-        <div className="bg-indigo-600/20 border border-indigo-500/50 p-6 rounded-3xl backdrop-blur-md flex flex-col md:flex-row items-center gap-4">
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-indigo-100">Configuración Requerida</h3>
-            <p className="text-indigo-300 text-sm">Para usar el Agente de IA, ingresa tu Gemini API Key. Se guardará solo en este navegador.</p>
+      {showKeyInput ? (
+        <div className="bg-indigo-600/20 border border-indigo-500/50 p-6 rounded-3xl backdrop-blur-md space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-indigo-100">🔑 Configurar API Key de Gemini (Gratis)</h3>
+              <p className="text-indigo-300 text-sm mt-1">Obtén tu clave gratuita en Google AI Studio y pégala aquí. Se guarda solo en este navegador.</p>
+            </div>
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold transition-all text-center"
+            >
+              🌐 Obtener Key Gratis →
+            </a>
           </div>
-          <div className="flex gap-2 w-full md:w-auto">
-            <input 
-              type="password" 
-              placeholder="AIzaSy..." 
-              className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white flex-1 md:w-64"
+          <div className="flex gap-2">
+            <input
+              type="password"
+              placeholder="Pega aquí tu API Key: AIzaSy..."
+              className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white flex-1 focus:border-indigo-400 outline-none transition-all"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveKey()}
             />
-            <button 
+            <button
               onClick={handleSaveKey}
-              className="bg-indigo-500 hover:bg-indigo-400 text-white px-6 py-2 rounded-xl font-bold transition-all"
+              disabled={!apiKey.trim()}
+              className="bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 text-white px-6 py-2 rounded-xl font-bold transition-all shrink-0"
             >
               Guardar
             </button>
           </div>
+          <p className="text-xs text-slate-500">📌 Pasos: ve a <strong className="text-slate-400">aistudio.google.com</strong> → inicia sesión con Google → clic en <em>Get API key</em> → crea una key → cópiala aquí.</p>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between bg-emerald-600/10 border border-emerald-500/30 px-5 py-3 rounded-2xl">
+          <p className="text-emerald-400 text-sm font-medium">✅ API Key de Gemini configurada y lista.</p>
+          <button onClick={handleClearKey} className="text-xs text-slate-500 hover:text-red-400 transition-colors">Cambiar key</button>
         </div>
       )}
 

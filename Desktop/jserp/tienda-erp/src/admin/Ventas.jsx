@@ -11,6 +11,7 @@ export default function Ventas() {
   const [mensaje, setMensaje] = useState('')
   const [showTrash, setShowTrash] = useState(false)
   const [ventasTrash, setVentasTrash] = useState([])
+  const [mostrarAgotados, setMostrarAgotados] = useState(false)
 
   // 🔄 Cargar categorías
   const cargarCategorias = async () => {
@@ -46,10 +47,12 @@ export default function Ventas() {
 
   // 🔢 Contar productos filtrados
   const getProductosFiltrados = () => {
-    return productos.filter(p => 
-      !categoriaSeleccionada || 
-      p.categorias?.nombre === categorias.find(c => c.id.toString() === categoriaSeleccionada)?.nombre
-    )
+    return productos.filter(p => {
+      const cumpleCategoria = !categoriaSeleccionada || 
+        p.categorias?.nombre === categorias.find(c => c.id.toString() === categoriaSeleccionada)?.nombre
+      const cumpleStock = mostrarAgotados || p.stock > 0
+      return cumpleCategoria && cumpleStock
+    })
   }
 
   // 🔄 Cargar clientes
@@ -371,6 +374,16 @@ export default function Ventas() {
                       </option>
                     ))}
                   </select>
+                  <button
+                    onClick={() => setMostrarAgotados(!mostrarAgotados)}
+                    className={`backdrop-blur-sm border-2 rounded-xl px-4 py-2 md:py-3 transition transform hover:scale-105 active:scale-95 shadow-lg text-xs sm:text-base whitespace-nowrap font-bold ${
+                      mostrarAgotados
+                        ? 'bg-purple-600 border-purple-400 text-white'
+                        : 'bg-slate-700 border-transparent text-white hover:bg-slate-600'
+                    }`}
+                  >
+                    {mostrarAgotados ? '🚫 Ocultar Agotados' : '👁️ Ver Agotados'}
+                  </button>
                 </div>
               )}
               {productos.length === 0 ? (

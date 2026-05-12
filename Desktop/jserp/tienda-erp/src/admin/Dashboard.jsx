@@ -35,6 +35,7 @@ import Creditos from './Creditos'
 import Reportes from './Reportes'
 import Analisis from './Analisis'
 import AIAgente from './AIAgente'
+import Usuarios from './Usuarios'
 
 export default function Dashboard() {
   const [seccionActiva, setSeccionActiva] = useState('ventas')
@@ -49,13 +50,54 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
       if (user) {
-        const { data: perfil, error } = await supabase
+        let { data: perfiles, error } = await supabase
           .from('perfiles')
           .select('*')
-          .eq('user_id', user.id)
-          .single()
+          .eq('id', user.id)
+        
+        let perfil = perfiles && perfiles.length > 0 ? perfiles[0] : null
 
-        if (!error && perfil) setProfile(perfil)
+        // 🛡️ Regla Especial: Admin por siempre
+        // Sincronizamos con la DB para que las políticas RLS funcionen correctamente
+        if (user.email?.toLowerCase() === 'heyjonadice@gmail.com') {
+          if (!perfil) {
+            // Crear perfil si no existe
+            const { data: newPerfil, error: insError } = await supabase
+              .from('perfiles')
+              .insert({ id: user.id, rol: 'admin', email: user.email })
+              .select()
+              .single()
+            
+            if (insError) {
+              // Si falla (ej. no existe columna email), reintentar sin email
+              const { data: retryPerfil } = await supabase
+                .from('perfiles')
+                .insert({ id: user.id, rol: 'admin' })
+                .select()
+                .single()
+              perfil = retryPerfil || { id: user.id, rol: 'admin' }
+            } else {
+              perfil = newPerfil
+            }
+          } else if (perfil.rol !== 'admin' || !perfil.email) {
+            // Actualizar si no es admin o falta el email
+            const { error: updError } = await supabase
+              .from('perfiles')
+              .update({ rol: 'admin', email: user.email })
+              .eq('id', user.id)
+            
+            if (updError) {
+              await supabase
+                .from('perfiles')
+                .update({ rol: 'admin' })
+                .eq('id', user.id)
+            }
+            perfil.rol = 'admin'
+            perfil.email = user.email
+          }
+        }
+
+        if (perfil) setProfile(perfil)
       }
     }
     getUser()
@@ -89,7 +131,7 @@ export default function Dashboard() {
         <div className="relative z-10 p-3 md:p-4 border-b border-slate-700 flex items-center justify-center md:justify-between">
           {sidebarOpen && (
             <div className="flex items-center gap-2 md:gap-3">
-              <span className="text-xl md:text-2xl">🏪</span>
+            <img src="/logo.png" alt="Logotipo de JonaStudio" className="w-8 h-8 md:w-10 md:h-10 object-cover rounded-full border-2 border-white"/>
               <h1 className="text-lg md:text-xl font-black text-slate-100 hidden sm:inline">JonaStudio</h1>
               <h1 className="text-lg font-black text-slate-100 sm:hidden">JonaS</h1>
             </div>
@@ -203,6 +245,22 @@ export default function Dashboard() {
             <span className="text-lg md:text-xl flex-shrink-0">🤖</span>
             {sidebarOpen && <span>Agente IA</span>}
           </button>
+          
+          {/* Sección exclusiva de Administradores */}
+          {profile?.rol === 'admin' && (
+            <button
+              onClick={() => setSeccionActiva('usuarios')}
+              className={`flex-shrink-0 md:w-full px-4 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 md:gap-3 font-semibold duration-300 text-xs md:text-base ${
+                seccionActiva === 'usuarios'
+                  ? 'bg-slate-700 text-white shadow-lg border border-slate-600'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50 border border-transparent hover:border-slate-600'
+              }`}
+              title={!sidebarOpen ? 'Usuarios' : ''}
+            >
+              <span className="text-lg md:text-xl flex-shrink-0">👥</span>
+              {sidebarOpen && <span>Usuarios</span>}
+            </button>
+          )}
         </nav>
       </div>
 
@@ -213,10 +271,10 @@ export default function Dashboard() {
           {/* Título de Sección */}
           <div className="w-full md:w-auto">
             <h2 className="text-xl md:text-2xl font-bold text-slate-100">
-              {seccionActiva === 'ventas' ? '🛍️ Sistema de Ventas' : seccionActiva === 'productos' ? '📦 Gestión de Productos' : seccionActiva === 'cuentas' ? '📊 Contabilidad & Cuentas' : seccionActiva === 'creditos' ? '💳 Créditos & Clientes' : seccionActiva === 'reportes' ? '📊 Generador de Reportes' : seccionActiva === 'ia' ? '🤖 Agente de Negocios IA' : '🧠 Análisis Inteligente'}
+              {seccionActiva === 'ventas' ? '🛍️ Sistema de Ventas' : seccionActiva === 'productos' ? '📦 Gestión de Productos' : seccionActiva === 'cuentas' ? '📊 Contabilidad & Cuentas' : seccionActiva === 'creditos' ? '💳 Créditos & Clientes' : seccionActiva === 'reportes' ? '📊 Generador de Reportes' : seccionActiva === 'ia' ? '🤖 Agente de Negocios IA' : seccionActiva === 'usuarios' ? '👥 Gestión de Usuarios' : '🧠 Análisis Inteligente'}
             </h2>
             <p className="text-slate-400 text-xs md:text-sm mt-1">
-              {seccionActiva === 'ventas' ? 'Registra y controla tus ventas' : seccionActiva === 'productos' ? 'Administra tu catálogo de productos' : seccionActiva === 'cuentas' ? 'Gestiona todas tus cuentas y transacciones' : seccionActiva === 'creditos' ? 'Maneja créditos a clientes y abonos' : seccionActiva === 'reportes' ? 'Analiza y descarga reportes de tu negocio' : seccionActiva === 'ia' ? 'Recomendaciones estratégicas basadas en tus datos reales' : 'Visión integral y proyecciones de rentabilidad'}
+              {seccionActiva === 'ventas' ? 'Registra y controla tus ventas' : seccionActiva === 'productos' ? 'Administra tu catálogo de productos' : seccionActiva === 'cuentas' ? 'Gestiona todas tus cuentas y transacciones' : seccionActiva === 'creditos' ? 'Maneja créditos a clientes y abonos' : seccionActiva === 'reportes' ? 'Analiza y descarga reportes de tu negocio' : seccionActiva === 'ia' ? 'Recomendaciones estratégicas basadas en tus datos reales' : seccionActiva === 'usuarios' ? 'Administra el acceso y roles del personal' : 'Visión integral y proyecciones de rentabilidad'}
             </p>
           </div>
 
@@ -270,6 +328,8 @@ export default function Dashboard() {
             <Analisis />
           ) : seccionActiva === 'ia' ? (
             <AIAgente />
+          ) : seccionActiva === 'usuarios' ? (
+            <Usuarios />
           ) : null}
         </div>
       </div>

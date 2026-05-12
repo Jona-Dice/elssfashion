@@ -25,8 +25,8 @@ export default function Home() {
       <nav className="sticky top-0 z-20 backdrop-blur-md bg-slate-800/30 border-b border-slate-700 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
           <div className="flex items-center gap-2 sm:gap-3 text-lg sm:text-2xl font-bold">
-            <span className="text-2xl sm:text-3xl">🏪</span>
-            <span className="text-slate-100 hidden sm:inline">JonaSstudio</span>
+            <img src="/logo.png" alt="Logotipo de JonaStudio" className="w-8 h-8 md:w-10 md:h-10 object-cover rounded-full border-2 border-white"/>
+            <span className="text-slate-100 hidden sm:inline">JonaStudio</span>
             <span className="text-slate-100 sm:hidden text-sm">JonaS</span>
           </div>
           <div className="flex gap-2 sm:gap-4">
@@ -153,14 +153,16 @@ export default function Home() {
             <div>
               <h4 className="text-slate-100 font-bold mb-3">Soporte</h4>
               <ul className="text-xs sm:text-sm space-y-2 text-slate-500">
-                <li>📧 support@tiendaerp.com</li>
+                <li>📧 heyjonadice@gmail.com</li>
                 <li>💬 Chat en Vivo 24/7</li>
               </ul>
             </div>
           </div>
           <div className="border-t border-slate-700 pt-6 text-center">
-            <p className="text-xs sm:text-sm">&copy; 2024 TiendaERP. Todos los derechos reservados.</p>
-          </div>
+  <p className="text-xs sm:text-sm text-slate-400">
+  © {new Date().getFullYear()} JonaStudio ERP • Todos los derechos reservados
+</p>
+</div>
         </div>
       </footer>
     </div>
