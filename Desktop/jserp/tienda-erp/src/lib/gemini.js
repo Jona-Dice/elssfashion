@@ -1,187 +1,172 @@
-// Gemini API - con auto-descubrimiento de modelos disponibles
-// En lugar de adivinar nombres, preguntamos a Google cuáles están activos con TU key
+// IA de Negocios usando Groq (gratuito, rápido, disponible en Latinoamérica)
+// Groq es una plataforma de IA que ofrece acceso gratuito a modelos como Llama 3.3
+// Registrate en console.groq.com para obtener tu API Key gratuita (gsk_...)
 
-const GEMINI_BASE_V1BETA = "https://generativelanguage.googleapis.com/v1beta";
-const GEMINI_BASE_V1     = "https://generativelanguage.googleapis.com/v1";
+const GROQ_BASE = "https://api.groq.com/openai/v1/chat/completions";
 
-// Cache de modelos disponibles (se consulta una vez por sesión)
-let _cachedModel = null;
+// Modelos de Groq ordenados por preferencia
+const MODELOS_GROQ = [
+  "llama-3.3-70b-versatile",   // Más potente y capaz
+  "llama-3.1-8b-instant",      // Más rápido, buen fallback
+  "mixtral-8x7b-32768",        // Excelente para análisis largo
+];
+
+let _modeloFuncional = null;
+
+// ── Manejo de la API Key ─────────────────────────────────────────────────────
 
 const getApiKey = () =>
-  localStorage.getItem('GEMINI_API_KEY') || import.meta.env.VITE_GEMINI_API_KEY || "";
+  localStorage.getItem('GROQ_API_KEY') || import.meta.env.VITE_GROQ_API_KEY || "";
 
 export const setGeminiKey = (key) => {
-  localStorage.setItem('GEMINI_API_KEY', key);
-  _cachedModel = null; // resetear caché al cambiar key
+  // Mantenemos el nombre de la función por compatibilidad con el resto del código
+  localStorage.setItem('GROQ_API_KEY', key.trim());
+  _modeloFuncional = null;
 };
 
 export const clearGeminiKey = () => {
-  localStorage.removeItem('GEMINI_API_KEY');
-  _cachedModel = null;
+  localStorage.removeItem('GROQ_API_KEY');
+  _modeloFuncional = null;
 };
 
 export const hasGeminiKey = () => !!getApiKey();
 
-/**
- * Descubre qué modelo y endpoint funcionan con la API key actual.
- * Prueba v1beta y v1, y modelos preferidos en orden.
- */
-async function discoverWorkingModel(apiKey) {
-  if (_cachedModel) return _cachedModel;
+// ── Llamada a la API de Groq ─────────────────────────────────────────────────
 
-  // Modelos de preferencia (de más nuevo a más compatible)
-  const preferredModels = [
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-2.5-flash-preview-04-17",
-    "gemini-2.5-pro-preview-05-06",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-pro",
-  ];
-
-  // Intentar primero descubrir via ListModels
-  for (const base of [GEMINI_BASE_V1BETA, GEMINI_BASE_V1]) {
-    try {
-      const listUrl = `${base}/models?key=${apiKey}`;
-      const res = await fetch(listUrl);
-      if (res.ok) {
-        const data = await res.json();
-        const available = (data.models || [])
-          .filter(m => m.supportedGenerationMethods?.includes("generateContent"))
-          .map(m => m.name.replace("models/", ""));
-
-        console.log(`📋 Modelos disponibles en ${base}:`, available);
-
-        // Buscar el mejor modelo preferido que esté disponible
-        for (const pref of preferredModels) {
-          if (available.some(a => a === pref || a.startsWith(pref))) {
-            const found = available.find(a => a === pref || a.startsWith(pref));
-            _cachedModel = { base, model: found };
-            console.log(`✅ Modelo seleccionado: ${found} en ${base}`);
-            return _cachedModel;
-          }
-        }
-
-        // Si no coincide ninguno preferido, usar el primero disponible
-        if (available.length > 0) {
-          _cachedModel = { base, model: available[0] };
-          console.log(`✅ Usando primer modelo disponible: ${available[0]} en ${base}`);
-          return _cachedModel;
-        }
-      }
-    } catch (e) {
-      console.warn(`⚠️ No se pudo listar modelos en ${base}:`, e.message);
-    }
-  }
-
-  // Si ListModels no funcionó, probar directamente cada combinación
-  for (const base of [GEMINI_BASE_V1BETA, GEMINI_BASE_V1]) {
-    for (const model of preferredModels) {
-      try {
-        const testUrl = `${base}/models/${model}:generateContent?key=${apiKey}`;
-        const res = await fetch(testUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: "hola" }] }] }),
-        });
-        if (res.ok || res.status === 400) {
-          // 400 puede ser error de formato pero el modelo existe
-          if (res.ok) {
-            _cachedModel = { base, model };
-            console.log(`✅ Modelo funcional: ${model} en ${base}`);
-            return _cachedModel;
-          }
-        }
-      } catch (_) { /* continuar */ }
-    }
-  }
-
-  throw new Error(
-    "❌ No se encontró ningún modelo disponible con tu API Key.\n\n" +
-    "Verifica:\n" +
-    "1. Que la key sea de Google AI Studio (aistudio.google.com/app/apikey)\n" +
-    "2. Que no sea una key de Google Cloud Console sin la API habilitada\n" +
-    "3. Que no hayas excedido el límite gratuito"
-  );
-}
-
-async function callGemini(base, apiKey, modelName, prompt) {
-  const url = `${base}/models/${modelName}:generateContent?key=${apiKey}`;
-
-  const response = await fetch(url, {
+async function callGroq(apiKey, modelName, systemPrompt, userPrompt) {
+  const response = await fetch(GROQ_BASE, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+      model: modelName,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 1024,
     }),
   });
 
   const data = await response.json();
 
+  // Log de diagnóstico (útil para detectar problemas)
   if (!response.ok) {
-    const errMsg = data?.error?.message || `HTTP ${response.status}`;
-    const err = new Error(errMsg);
+    console.warn(`⚠️ Groq [${modelName}] HTTP ${response.status}:`, data?.error?.message);
+    const err = new Error(data?.error?.message || `HTTP ${response.status}`);
     err.status = response.status;
     throw err;
   }
 
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = data?.choices?.[0]?.message?.content;
   if (!text) throw new Error("Respuesta vacía del modelo.");
   return text;
 }
 
+// ── Función con fallback automático entre modelos ────────────────────────────
+
+async function callConFallback(apiKey, systemPrompt, userPrompt) {
+  // Si ya sabemos qué modelo funciona, usarlo directamente
+  if (_modeloFuncional) {
+    try {
+      return await callGroq(apiKey, _modeloFuncional, systemPrompt, userPrompt);
+    } catch (err) {
+      if (err.status === 429 || err.status === 401) throw err;
+      _modeloFuncional = null; // Resetear si el modelo deja de funcionar
+    }
+  }
+
+  // Probar cada modelo hasta encontrar uno disponible
+  let lastError = null;
+  for (const modelo of MODELOS_GROQ) {
+    try {
+      const result = await callGroq(apiKey, modelo, systemPrompt, userPrompt);
+      _modeloFuncional = modelo;
+      console.log(`✅ Groq IA activa usando: ${modelo}`);
+      return result;
+    } catch (err) {
+      lastError = err;
+      if (err.status === 401 || err.status === 429) throw err;
+      console.warn(`⚠️ Modelo ${modelo} no disponible, probando siguiente...`);
+    }
+  }
+
+  throw lastError || new Error("No se pudo conectar con ningún modelo de Groq.");
+}
+
+// ── Función principal exportada ───────────────────────────────────────────────
+
 export const analyzeBusinessData = async (data, moduleType, customPrompt = "") => {
   const apiKey = getApiKey();
-  if (!apiKey) throw new Error("No hay API Key de Gemini configurada.");
+  if (!apiKey) throw new Error("No hay API Key de Groq configurada.");
 
-  const systemPrompt = `Eres un experto consultor de negocios y analista financiero para un ERP de una tienda (JonaStudio). 
+  const systemPrompt = `Eres un experto consultor de negocios y analista financiero para un ERP de una tienda llamada JonaStudio. 
 Tu objetivo es analizar los datos proporcionados y dar recomendaciones accionables, breves y profesionales en español.
-Usa un tono premium, alentador y directo.\n\n`;
+Usa un tono premium, alentador y directo. Sé conciso y práctico.`;
 
   let userPrompt = "";
   const contextData = JSON.stringify(data, null, 2);
 
   switch (moduleType) {
     case 'finance':
-      userPrompt = `Analiza la salud financiera: Ingresos: ${data.ingresosVentas}, Egresos: ${data.egresosOperativos}, Otros Ingresos: ${data.ingresosExtra}, Balance Neto: ${data.balanceNeto}, Dinero por Cobrar: ${data.porCobrar}. Da 3 puntos clave y una recomendación.`;
+      userPrompt = `Analiza la salud financiera de JonaStudio:
+- Ingresos por Ventas: ${data.ingresosVentas}
+- Egresos Operativos: ${data.egresosOperativos}
+- Otros Ingresos: ${data.ingresosExtra}
+- Balance Neto: ${data.balanceNeto}
+- Dinero por Cobrar (Créditos): ${data.porCobrar}
+
+Da exactamente 3 puntos clave de la situación financiera y 1 recomendación de acción inmediata.`;
       break;
     case 'marketing':
-      userPrompt = `Analiza marketing: Top Productos: ${JSON.stringify(data.topProductos)}, Ventas: ${data.totalVentas}, Clientes: ${data.totalClientes || 'N/A'}. Sugiere 2 estrategias y qué publicitar.`;
+      userPrompt = `Analiza la estrategia de marketing de JonaStudio:
+- Top 5 Productos más vendidos: ${JSON.stringify(data.topProductos)}
+- Total Ventas realizadas: ${data.totalVentas}
+- Total Clientes: ${data.totalClientes || 'N/A'}
+
+Sugiere 2 estrategias concretas de marketing y cuáles productos publicitar primero.`;
       break;
     case 'inventory':
-      userPrompt = `Analiza inventario: Valor: ${data.valorInventario}, Agotados: ${data.agotados}, Estancados: ${JSON.stringify(data.productosEstancados)}. Identifica riesgos y qué hacer con lo estancado.`;
+      userPrompt = `Analiza el inventario de JonaStudio:
+- Valor total del inventario: ${data.valorInventario}
+- Productos agotados: ${data.agotados}
+- Productos sin ventas en más de 30 días: ${JSON.stringify(data.productosEstancados)}
+
+Identifica los mayores riesgos y qué hacer con los productos estancados.`;
       break;
     case 'trends':
-      userPrompt = `Analiza tendencias: Top Recientes: ${JSON.stringify(data.topProductos)}, Estancados: ${JSON.stringify(data.productosEstancados)}. ¿Qué crecerá más?`;
+      userPrompt = `Analiza las tendencias de ventas de JonaStudio:
+- Productos más vendidos recientemente: ${JSON.stringify(data.topProductos)}
+- Productos estancados: ${JSON.stringify(data.productosEstancados)}
+
+¿Cuáles productos tienen más potencial de crecimiento? ¿Qué tendencias ves?`;
       break;
     case 'chat':
-      userPrompt = `Pregunta: "${customPrompt}"\nDatos:\n${contextData}\nResponde conciso y basado en datos.`;
+      userPrompt = `El dueño de JonaStudio te hace esta pregunta: "${customPrompt}"
+      
+Datos actuales del negocio:
+${contextData}
+
+Responde de forma concisa, práctica y basada en los datos reales del negocio.`;
       break;
     default:
-      userPrompt = customPrompt || "Analiza estos datos de negocio y dame un resumen ejecutivo.";
+      userPrompt = customPrompt || "Analiza estos datos de negocio y dame un resumen ejecutivo en 5 puntos.";
   }
 
-  const fullPrompt = systemPrompt + userPrompt;
-
-  // Descubrir el modelo que funciona con esta key
-  const { base, model } = await discoverWorkingModel(apiKey);
-
   try {
-    return await callGemini(base, apiKey, model, fullPrompt);
+    return await callConFallback(apiKey, systemPrompt, userPrompt);
   } catch (err) {
-    // Si falla el modelo cacheado, resetear y lanzar error claro
-    _cachedModel = null;
-
-    if (err.status === 400 && err.message?.includes("API_KEY_INVALID")) {
-      throw new Error("🔑 API Key inválida. Copia la key correctamente desde aistudio.google.com/app/apikey");
-    }
     if (err.status === 429) {
-      throw new Error("⏳ Límite de uso alcanzado. Espera 1 minuto (Free Tier: ~15 req/min).");
+      throw new Error("⏳ Límite de tasa alcanzado. Espera un momento e intenta de nuevo (Free Tier: ~30 req/min).");
     }
-    if (err.status === 403) {
-      throw new Error("🚫 Sin permisos. Verifica que tu API Key esté activa.");
+    if (err.status === 401) {
+      throw new Error("🔑 API Key inválida. Cópiala correctamente desde console.groq.com → API Keys.");
+    }
+    if (err.status === 400) {
+      throw new Error("❌ Error en la solicitud. Intenta de nuevo.");
     }
     throw new Error("❌ " + err.message);
   }

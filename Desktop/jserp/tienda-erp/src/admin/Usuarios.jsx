@@ -53,12 +53,11 @@ export default function Usuarios() {
           setMensaje('❌ Error: ' + (error.message || 'No se pudo crear el usuario'))
         }
       } else {
-        setMensaje('✅ ¡Usuario Creado! IMPORTANTE: Por seguridad de Supabase, se ha iniciado sesión con la nueva cuenta. Debes cerrar sesión y volver a entrar con tu cuenta de Admin para seguir gestionando.')
+        setMensaje('✅ ¡Usuario Creado con éxito!')
         setEmail('')
         setPassword('')
         setRole('vendedor')
-        // No llamamos a cargarUsuarios() porque probablemente ya no tengamos permisos 
-        // ya que la sesión cambió al nuevo usuario.
+        await cargarUsuarios() // Recargar la lista ya que no perdemos la sesión
       }
     } catch (err) {
       console.error(err)
@@ -273,15 +272,7 @@ export default function Usuarios() {
               
               {/* Nota Informativa */}
               <div className="mt-8 space-y-4">
-                <div className="p-4 bg-amber-400/5 border border-amber-400/10 rounded-xl flex gap-3 items-start">
-                  <span className="text-xl">💡</span>
-                  <div className="space-y-1">
-                    <p className="text-[11px] md:text-sm text-slate-100 font-bold uppercase tracking-tight">Comportamiento de Seguridad</p>
-                    <p className="text-[11px] md:text-xs text-slate-400 leading-relaxed">
-                      Por seguridad de Supabase, al crear un usuario nuevo desde el cliente, <span className="text-amber-400">el sistema iniciará sesión automáticamente con la nueva cuenta</span>. Perderás el acceso de Admin momentáneamente y deberás cerrar sesión y volver a entrar con tu cuenta principal para seguir gestionando.
-                    </p>
-                  </div>
-                </div>
+
 
                 <div className="p-4 bg-blue-400/5 border border-blue-400/10 rounded-xl flex gap-3 items-start">
                   <span className="text-xl">ℹ️</span>

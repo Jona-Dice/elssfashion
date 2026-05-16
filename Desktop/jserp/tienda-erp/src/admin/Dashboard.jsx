@@ -57,47 +57,13 @@ export default function Dashboard() {
         
         let perfil = perfiles && perfiles.length > 0 ? perfiles[0] : null
 
-        // 🛡️ Regla Especial: Admin por siempre
-        // Sincronizamos con la DB para que las políticas RLS funcionen correctamente
-        if (user.email?.toLowerCase() === 'heyjonadice@gmail.com') {
-          if (!perfil) {
-            // Crear perfil si no existe
-            const { data: newPerfil, error: insError } = await supabase
-              .from('perfiles')
-              .insert({ id: user.id, rol: 'admin', email: user.email })
-              .select()
-              .single()
-            
-            if (insError) {
-              // Si falla (ej. no existe columna email), reintentar sin email
-              const { data: retryPerfil } = await supabase
-                .from('perfiles')
-                .insert({ id: user.id, rol: 'admin' })
-                .select()
-                .single()
-              perfil = retryPerfil || { id: user.id, rol: 'admin' }
-            } else {
-              perfil = newPerfil
-            }
-          } else if (perfil.rol !== 'admin' || !perfil.email) {
-            // Actualizar si no es admin o falta el email
-            const { error: updError } = await supabase
-              .from('perfiles')
-              .update({ rol: 'admin', email: user.email })
-              .eq('id', user.id)
-            
-            if (updError) {
-              await supabase
-                .from('perfiles')
-                .update({ rol: 'admin' })
-                .eq('id', user.id)
-            }
-            perfil.rol = 'admin'
-            perfil.email = user.email
-          }
+        if (perfil) {
+          setProfile(perfil)
+        } else {
+          // Si no tiene perfil aún, podemos usar un objeto temporal
+          // La base de datos ahora se encarga de crear el perfil vía Trigger
+          setProfile({ id: user.id, rol: 'vendedor', email: user.email })
         }
-
-        if (perfil) setProfile(perfil)
       }
     }
     getUser()
@@ -121,24 +87,28 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-slate-950 flex-col md:flex-row">
       {/* Sidebar Premium Colapsable */}
-      <div className={`bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white shadow-2xl border-b md:border-b-0 md:border-r border-slate-700 transition-all duration-300 ease-in-out flex flex-col ${sidebarOpen ? 'w-full md:w-64' : 'w-full md:w-20'}`}>
+      <div className={`relative bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white shadow-2xl border-b md:border-b-0 md:border-r border-slate-700 transition-all duration-300 ease-in-out flex flex-col ${sidebarOpen ? 'w-full md:w-64' : 'w-full md:w-20'}`}>
         {/* Fondo decorativo */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-0 w-40 h-40 bg-slate-700/10 rounded-full blur-3xl"></div>
         </div>
 
-        {/* Header con botón toggle */}
-        <div className="relative z-10 p-3 md:p-4 border-b border-slate-700 flex items-center justify-center md:justify-between">
-          {sidebarOpen && (
-            <div className="flex items-center gap-2 md:gap-3">
+        {/* Header con logo */}
+        <div className={`relative z-10 p-3 md:p-4 border-b border-slate-700 flex items-center h-[68px] md:h-[73px] ${sidebarOpen ? 'justify-between' : 'justify-between md:justify-center'}`}>
+          <div className="flex items-center gap-2 md:gap-3">
             <img src="/logo.png" alt="Logotipo de JonaStudio" className="w-8 h-8 md:w-10 md:h-10 object-cover rounded-full border-2 border-white"/>
-              <h1 className="text-lg md:text-xl font-black text-slate-100 hidden sm:inline">JonaStudio</h1>
-              <h1 className="text-lg font-black text-slate-100 sm:hidden">JonaS</h1>
-            </div>
-          )}
+            {sidebarOpen && (
+              <>
+                <h1 className="text-lg md:text-xl font-black text-slate-100 hidden sm:inline">JonaStudio</h1>
+                <h1 className="text-lg font-black text-slate-100 sm:hidden">JonaS</h1>
+              </>
+            )}
+          </div>
+          
+          {/* Botón toggle móvil (dentro del header) */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-slate-700/50 rounded-lg transition-all text-slate-300 hover:text-white md:ml-auto"
+            className="md:hidden p-2 hover:bg-slate-700/50 rounded-lg transition-all text-slate-300 hover:text-white"
           >
             {sidebarOpen ? (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -151,6 +121,22 @@ export default function Dashboard() {
             )}
           </button>
         </div>
+
+        {/* Botón toggle Flotante en Desktop (borde derecho) */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="hidden md:flex absolute -right-3 top-6 z-50 w-6 h-6 bg-slate-800 border border-slate-600 rounded-full items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 hover:scale-110 transition-all shadow-md"
+        >
+          {sidebarOpen ? (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          )}
+        </button>
 
         {/* Descripción (solo cuando está abierto) */}
         {sidebarOpen && (

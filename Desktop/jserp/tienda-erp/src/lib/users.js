@@ -1,8 +1,8 @@
-import { supabase } from './supabase'
+import { supabase, supabaseSecundario } from './supabase'
 
 export async function createUserWithRole({ email, password, role = 'vendedor' }) {
-  // 1. Crear usuario en Supabase Auth
-  const { data, error: authError } = await supabase.auth.signUp({ 
+  // 1. Crear usuario en Supabase Auth usando el cliente secundario
+  const { data, error: authError } = await supabaseSecundario.auth.signUp({ 
     email, 
     password,
     options: {

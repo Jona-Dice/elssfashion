@@ -155,11 +155,11 @@ export default function AIAgente() {
         <div className="bg-indigo-600/20 border border-indigo-500/50 p-6 rounded-3xl backdrop-blur-md space-y-4">
           <div className="flex flex-col md:flex-row md:items-center gap-4">
             <div className="flex-1">
-              <h3 className="text-xl font-bold text-indigo-100">🔑 Configurar API Key de Gemini (Gratis)</h3>
-              <p className="text-indigo-300 text-sm mt-1">Obtén tu clave gratuita en Google AI Studio y pégala aquí. Se guarda solo en este navegador.</p>
+              <h3 className="text-xl font-bold text-indigo-100">🔑 Configurar API Key de Groq (Gratis)</h3>
+              <p className="text-indigo-300 text-sm mt-1">Groq es gratuito, rapidísimo y disponible en toda Latinoamérica. Obtén tu clave en console.groq.com</p>
             </div>
             <a
-              href="https://aistudio.google.com/app/apikey"
+              href="https://console.groq.com/keys"
               target="_blank"
               rel="noopener noreferrer"
               className="shrink-0 bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold transition-all text-center"
@@ -170,7 +170,7 @@ export default function AIAgente() {
           <div className="flex gap-2">
             <input
               type="password"
-              placeholder="Pega aquí tu API Key: AIzaSy..."
+              placeholder="Pega aquí tu API Key: gsk_..."
               className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white flex-1 focus:border-indigo-400 outline-none transition-all"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
@@ -184,11 +184,11 @@ export default function AIAgente() {
               Guardar
             </button>
           </div>
-          <p className="text-xs text-slate-500">📌 Pasos: ve a <strong className="text-slate-400">aistudio.google.com</strong> → inicia sesión con Google → clic en <em>Get API key</em> → crea una key → cópiala aquí.</p>
+          <p className="text-xs text-slate-500">📌 Pasos: ve a <strong className="text-slate-400">console.groq.com</strong> → inicia sesión → <em>API Keys</em> → <em>Create API Key</em> → cópiala aquí. La clave comienza con <code className="text-indigo-400">gsk_</code></p>
         </div>
       ) : (
         <div className="flex items-center justify-between bg-emerald-600/10 border border-emerald-500/30 px-5 py-3 rounded-2xl">
-          <p className="text-emerald-400 text-sm font-medium">✅ API Key de Gemini configurada y lista.</p>
+          <p className="text-emerald-400 text-sm font-medium">✅ API Key de Groq configurada y lista.</p>
           <button onClick={handleClearKey} className="text-xs text-slate-500 hover:text-red-400 transition-colors">Cambiar key</button>
         </div>
       )}
